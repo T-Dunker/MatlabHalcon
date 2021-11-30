@@ -14,5 +14,6 @@ modelId = halcon.CreateScaledShapeModelXld(xld, ...);
 [rows, cols, angles, scales, scores] = halcon.FindScaledShapeModel(searchImage, modelId, ...);
 ```
 
+There is some real code to try in example.m.
 
 [![View MVTec Halcon wrapper with XLD serialization on File Exchange](https://www.mathworks.com/matlabcentral/images/matlab-file-exchange.svg)](https://de.mathworks.com/matlabcentral/fileexchange/70976-mvtec-halcon-wrapper-with-xld-serialization)

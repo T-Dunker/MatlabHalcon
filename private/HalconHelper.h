@@ -12,6 +12,7 @@ typedef unsigned __int64 UInt64;
 typedef unsigned long long UInt64;
 #endif
 
+
 using namespace HalconCpp;
 
 int MatlabArray2HalconTuple(const mxArray *mxData, HTuple* hData)
@@ -43,6 +44,25 @@ int MatlabArray2HalconTuple(const mxArray *mxData, HTuple* hData)
     int* DInt32 = (int*)mxGetData(mxData);
     for (int i = 0; i < Ne; i++) { (*hData)[i] = DInt32[i]; }
   }
+  /*
+  else if (mxIsUint32(mxData))
+  {
+    unsigned int* DUint32 = (unsigned int*)mxGetData(mxData);
+    for (int i = 0; i < Ne; i++) { (*hData)[i] = DUint32[i]; }
+  }
+  */
+  else if (mxIsInt64(mxData))
+  {
+    std::int64_t* DInt64 = (std::int64_t*)mxGetData(mxData);
+    for (int i = 0; i < Ne; i++) { (*hData)[i] = DInt64[i]; }
+  }
+  /*
+  else if (mxIsUint64(mxData))
+  {
+    std::uint64_t* DUint64 = (std::uint64_t*)mxGetData(mxData);
+    for (int i = 0; i < Ne; i++) { (*hData)[i] = DUint64[i]; }
+  }
+  */
   else if (mxIsSingle(mxData))
   {
     float* DSingle = (float*)mxGetData(mxData);
@@ -53,6 +73,15 @@ int MatlabArray2HalconTuple(const mxArray *mxData, HTuple* hData)
     double* DDouble = (double*)mxGetData(mxData);
     for (int i = 0; i < Ne; i++) { (*hData)[i] = DDouble[i]; }
   }
+#ifdef HCPP_HHANDLE
+  else if (mxIsUint64(mxData))
+  {
+    uint64_t* DUint64 = (uint64_t*)mxGetData(mxData);
+    for (int i = 0; i < Ne; i++) { 
+      (*hData)[i] = HHandle(DUint64[i]); 
+    }
+  }
+#endif
   else if (mxIsChar(mxData))
   {
     ((*hData)) = mxArrayToString(mxData);
@@ -93,11 +122,15 @@ int HalconTuple2MatlabArray(HTuple* hData, mxArray **plhs)
 
   if (hv_type == 1) // Int
   {
+#if defined(_LP64) || defined(_WIN64)
+    plhs[0] = mxCreateNumericArray(nDims, dimsD, mxINT64_CLASS, mxREAL);
+#else
     plhs[0] = mxCreateNumericArray(nDims, dimsD, mxINT32_CLASS, mxREAL);
-    int* dataInt32 = (int*)mxGetData(plhs[0]);
+#endif
+    Hlong* dataInt = (Hlong*)mxGetData(plhs[0]);
     for (int i = 0; i < hv_length; i++)
     {
-      dataInt32[i] = (int)((*hData)[i]);
+      dataInt[i] = (*hData)[i].L();
     }
   }
   else if (hv_type == 2) //real
@@ -106,7 +139,7 @@ int HalconTuple2MatlabArray(HTuple* hData, mxArray **plhs)
     double* dataDouble = (double*)mxGetData(plhs[0]);
     for (int i = 0; i < hv_length; i++)
     {
-      dataDouble[i] = (double)((*hData)[i]);
+      dataDouble[i] = (*hData)[i].D();
     }
   }
   else if (hv_type == 4) //string
@@ -122,7 +155,7 @@ int HalconTuple2MatlabArray(HTuple* hData, mxArray **plhs)
       dimsC[1] = hv_charlength;
       plhs[0] = mxCreateCharArray(2, dimsC);
       mxChar* dataChar = (mxChar *)mxGetData(plhs[0]);
-      const char* str = (*hData)[0];
+      const char* str = (*hData)[0].S().Text();
       for (int i = 0; i < hv_charlength; i++)
       {
         dataChar[i] = str[i];
@@ -145,7 +178,19 @@ int HalconTuple2MatlabArray(HTuple* hData, mxArray **plhs)
       mxSetCell(plhs[0], i, value);
     }
   }
-  else if (hv_type == 15) //empty - Any
+#ifdef  HCPP_HHANDLE
+  else if (hv_type == 16) //handle
+  {
+    plhs[0] = mxCreateNumericArray(nDims, dimsD, mxUINT64_CLASS, mxREAL);
+    uint64_t* data = (uint64_t*)mxGetData(plhs[0]);
+    for (int i = 0; i < hv_length; i++)
+    {
+      HHandle h = (*hData)[i];
+      data[i] = h.GetHandle();
+    }
+  }
+#endif
+  else if (hv_type == 15 || hv_type == 31) //empty - Any
   {
     mwSize dimsE[3];
     dimsE[0] = 0;

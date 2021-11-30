@@ -36,13 +36,7 @@ delete(fullfile(packageFolder, '*.cpp'));
 delete(fullfile(packageFolder, '*.h'));
 
 %% deploy
-root = getenv('HALCONROOT');
-halconVersion = regexp(root, '(?<=HALCON-)(\d|\.)*', 'match', 'once');
-deployFolder = fullfile(thisFolder, '..', ...
-    sprintf('halcon-%s-%s-%s', ...
-    halconVersion, ...
-    computer('arch'), ...
-    lower(mex.getCompilerConfigurations('C++').ShortName)));
+deployFolder = getDeployFolder();
 if ~isfolder(deployFolder)
     mkdir(deployFolder);
 end
