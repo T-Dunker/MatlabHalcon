@@ -74,11 +74,39 @@ int MatlabArray2HalconTuple(const mxArray *mxData, HTuple* hData)
     for (int i = 0; i < Ne; i++) { (*hData)[i] = DDouble[i]; }
   }
 #ifdef HCPP_HHANDLE
-  else if (mxIsUint64(mxData))
+  else if (mxIsStruct(mxData))
   {
-    uint64_t* DUint64 = (uint64_t*)mxGetData(mxData);
-    for (int i = 0; i < Ne; i++) { 
-      (*hData)[i] = HHandle(DUint64[i]); 
+    try
+    {
+      int nfields = mxGetNumberOfFields(mxData);
+      for (int i = 0; i < Ne; i++)
+      {
+        const mxArray *mxHandle = 0;
+        for (int ifield = 0; ifield < nfields; ifield++)
+        {
+          mxArray *tmp = mxGetFieldByNumber(mxData, i, ifield);
+          const char *fname = mxGetFieldNameByNumber(mxData, ifield);
+          if (strcmp(fname, "handle") == 0)
+          {
+            if (tmp != NULL ? !mxIsEmpty(tmp) : false)
+            {
+              mxHandle = tmp;
+            }
+          }
+        }
+        if (mxHandle == 0)
+        {
+          mexErrMsgTxt("No Input Handle Found");
+        }
+        HSerializedItem item(mxGetData(mxHandle), mxGetNumberOfElements(mxHandle), "false");
+        HHandle h;
+        h.DeserializeHandle(item);
+        (*hData)[i] = h;
+      }
+    }
+    catch (HalconCpp::HException &HDevExpDefaultException)
+    {
+      mexErrMsgTxt(HDevExpDefaultException.ErrorMessage().Text());
     }
   }
 #endif
@@ -181,12 +209,25 @@ int HalconTuple2MatlabArray(HTuple* hData, mxArray **plhs)
 #ifdef  HCPP_HHANDLE
   else if (hv_type == 16) //handle
   {
-    plhs[0] = mxCreateNumericArray(nDims, dimsD, mxUINT64_CLASS, mxREAL);
+    const char* fn [] = { "handle" };
+    plhs[0] = mxCreateStructArray(nDims, dimsD, 1, fn);
     uint64_t* data = (uint64_t*)mxGetData(plhs[0]);
     for (int i = 0; i < hv_length; i++)
     {
-      HHandle h = (*hData)[i];
-      data[i] = h.GetHandle();
+      try
+      {
+        const HHandle& h = (*hData)[i];
+        HSerializedItem item = h.SerializeHandle();
+        Hlong sz(0);
+        void* pData = item.GetSerializedItemPtr(&sz);
+        mxArray* mxField = mxCreateNumericMatrix(sz, 1, mxUINT8_CLASS, mxREAL);
+        memcpy(mxGetData(mxField), pData, sz);
+        mxSetField(plhs[0], i, "handle", mxField);
+      }
+      catch (HalconCpp::HException &HDevExpDefaultException)
+      {
+        mexErrMsgTxt(HDevExpDefaultException.ErrorMessage().Text());
+      }
     }
   }
 #endif
@@ -197,7 +238,6 @@ int HalconTuple2MatlabArray(HTuple* hData, mxArray **plhs)
     dimsE[1] = 0;
     plhs[0] = mxCreateNumericArray(2, dimsE, mxDOUBLE_CLASS, mxREAL);
   }
-
   return 0;
 }
 
@@ -510,12 +550,8 @@ int MatlabArray2HalconObject(const mxArray *input, HObject* hImagep)
               MatlabArray2HalconRegion(mxRegion, &hImaget);
             }
           }
-
           ConcatObj(*hImagep, hImaget, hImagep);
-
-
         }
-
       }
     }
     else
@@ -628,9 +664,6 @@ int HalconRegion2MatlabArray(HObject* ho_region, mxArray **plhs)
   }
   return 0;
 }
-
-
-
 
 int HalconObject2MatlabArray(HObject* hImagep, mxArray **plhs)
 {
